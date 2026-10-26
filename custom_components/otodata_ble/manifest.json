@@ -1,10 +1,9 @@
 {
   "domain": "otodata_ble",
-  "name": "OtoData BLE",
+  "name": "Otodata BLE",
   "codeowners": [
     "@jterrace"
   ],
-  "config_flow": true,
   "documentation": "https://github.com/jterrace/ha-otodata-ble",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/jterrace/ha-otodata-ble/issues",
