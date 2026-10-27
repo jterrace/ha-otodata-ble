@@ -18,5 +18,12 @@
         "description": "Choose a device to set up"
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "propane_level": {
+        "name": "Propane level"
+      }
+    }
   }
 }

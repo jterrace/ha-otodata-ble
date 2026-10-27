@@ -1,0 +1,9 @@
+{
+  "entity": {
+    "sensor": {
+      "propane_level": {
+        "default": "mdi:propane-tank"
+      }
+    }
+  }
+}
