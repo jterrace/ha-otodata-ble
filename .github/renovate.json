@@ -10,8 +10,21 @@
   "customManagers": [],
   "packageRules": [
     {
-      "description": "homeassistant must match the homeassistant key in hacs.json",
-      "matchPackageNames": ["homeassistant"],
+      "description": "Must match the homeassistant key in hacs.json: pytest-homeassistant-custom-component pins homeassistant, and the rest are that version's bluetooth and usb requirements",
+      "matchPackageNames": [
+        "homeassistant",
+        "pytest-homeassistant-custom-component",
+        "aioesphomeapi",
+        "aiousbwatcher",
+        "bleak",
+        "bleak-retry-connector",
+        "bluetooth-adapters",
+        "bluetooth-auto-recovery",
+        "bluetooth-data-tools",
+        "dbus-fast",
+        "habluetooth",
+        "serialx"
+      ],
       "enabled": false
     }
   ]

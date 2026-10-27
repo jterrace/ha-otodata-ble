@@ -1,10 +1,22 @@
 {
   "domain": "otodata_ble",
   "name": "Otodata BLE",
+  "bluetooth": [
+    {
+      "connectable": false,
+      "manufacturer_data_start": [79, 84, 79],
+      "manufacturer_id": 945
+    }
+  ],
   "codeowners": [
     "@jterrace"
   ],
+  "config_flow": true,
+  "dependencies": [
+    "bluetooth_adapters"
+  ],
   "documentation": "https://github.com/jterrace/ha-otodata-ble",
+  "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/jterrace/ha-otodata-ble/issues",
   "version": "0.1.0"

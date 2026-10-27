@@ -9,15 +9,27 @@ lint = [
     "ruff==0.15.21",
 ]
 test = [
-    "pytest==9.1.1",
-    "pytest-cov==7.1.0",
+    # Pins pytest, pytest-cov and homeassistant (2026.6.4). The homeassistant
+    # version must match the homeassistant key in hacs.json.
+    "pytest-homeassistant-custom-component==0.13.340",
+    # Requirements of that homeassistant version's bluetooth and usb components,
+    # plus aioesphomeapi, which serialx imports. HA installs these at runtime;
+    # tests need them to load bluetooth.
+    "aioesphomeapi==45.3.1",
+    "aiousbwatcher==1.1.2",
+    "bleak==3.0.2",
+    "bleak-retry-connector==4.6.1",
+    "bluetooth-adapters==2.3.0",
+    "bluetooth-auto-recovery==1.6.4",
+    "bluetooth-data-tools==1.29.18",
+    "dbus-fast==5.0.16",
+    "habluetooth==6.8.1",
+    "serialx==1.8.0",
 ]
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
     "colorlog==6.10.1",
-    # Keep in sync with the homeassistant key in hacs.json.
-    "homeassistant==2026.6.4",
 ]
 
 [tool.uv]
@@ -27,3 +39,4 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
