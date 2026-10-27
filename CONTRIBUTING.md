@@ -1,61 +1,51 @@
-# Contribution guidelines
+# Contributing
 
-Contributing to this project should be as easy and transparent as possible, whether it's:
+Bug reports and pull requests are welcome. Use [GitHub issues](../../issues)
+for bugs and feature requests. Include debug logs (see the README) and your
+monitor's model.
 
-- Reporting a bug
-- Discussing the current state of the code
-- Submitting a fix
-- Proposing new features
+## Development setup
 
-## Github is used for everything
+You need [uv](https://docs.astral.sh/uv/). The dev container installs it for
+you.
 
-Github is used to host code, to track issues and feature requests, as well as accept pull requests.
+- `scripts/setup` installs dependencies into `.venv`.
+- `scripts/lint` formats and lints with ruff.
+- `scripts/develop` runs Home Assistant on port 8123 with the integration
+  loaded.
 
-Pull requests are the best way to propose changes to the codebase.
+`scripts/develop` uses `config/configuration.yaml`. It has no Bluetooth, so
+it can't see a real monitor. Use the tests for most work.
 
-1. Fork the repo and create your branch from `main`.
-2. If you've changed something, update the documentation.
-3. Make sure your code lints (using `scripts/lint`).
-4. Test you contribution.
-5. Issue that pull request!
+## Tests
 
-## Any contributions you make will be under the MIT Software License
+```sh
+uv run pytest
+```
 
-In short, when you submit code changes, your submissions are understood to be under the same [MIT License](http://choosealicense.com/licenses/mit/) that covers the project. Feel free to contact the maintainers if that's a concern.
+The tests use payloads captured from real monitors. If you have a monitor
+that isn't covered, add its payloads to the tests.
 
-## Report bugs using Github's [issues](../../issues)
+## Validation
 
-GitHub issues are used to track public bugs.
-Report a bug by [opening a new issue](../../issues/new/choose); it's that easy!
+CI runs hassfest and the HACS checks. To run hassfest locally:
 
-## Write bug reports with detail, background, and sample code
+```sh
+docker run --rm -v "$PWD":/github/workspace ghcr.io/home-assistant/hassfest
+```
 
-**Great Bug Reports** tend to have:
+The HACS check reads the repository from GitHub, so it only runs in CI.
 
-- A quick summary and/or background
-- Steps to reproduce
-  - Be specific!
-  - Give sample code if you can.
-- What you expected would happen
-- What actually happens
-- Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
+## Dependencies
 
-People *love* thorough bug reports. I'm not even kidding.
+Dependencies are pinned in `pyproject.toml` and locked in `uv.lock`.
+Renovate opens pull requests to update them.
 
-## Use a Consistent Coding Style
-
-Use [black](https://github.com/ambv/black) to make sure the code follows the style.
-
-## Test your code modification
-
-This custom component is based on [integration_blueprint template](https://github.com/ludeeus/integration_blueprint).
-
-It comes with development environment in a container, easy to launch
-if you use Visual Studio Code. With this container you will have a stand alone
-Home Assistant instance running and already configured with the included
-[`configuration.yaml`](./config/configuration.yaml)
-file.
+`pytest-homeassistant-custom-component` pins the Home Assistant version used
+in tests. That version, the Bluetooth packages listed with it, and the
+`homeassistant` key in `hacs.json` must all match. Renovate leaves them
+alone, so update them together by hand.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under its MIT License.
+Contributions are licensed under the [MIT License](LICENSE).

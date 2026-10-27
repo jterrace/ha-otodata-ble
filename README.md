@@ -1,51 +1,61 @@
-# Home Assistant Otodata Bluetooth Low Energy
+# Home Assistant Otodata BLE
 
-A Home Assistant integration for picking up Bluetooth Low Energy (BLE) messages from an
-Otodata fuel tank monitor.
+Home Assistant integration for Otodata propane tank monitors. It reads the tank
+level from the monitor's Bluetooth broadcasts.
 
----
+Tested with a TM6030. Other Otodata monitors that broadcast the same packets
+should work. Open an issue if yours doesn't.
 
-## What?
+## Requirements
 
-This repository contains multiple files, here is a overview:
+- Home Assistant 2026.6.4 or newer
+- A Bluetooth adapter or an ESPHome Bluetooth proxy within range of the tank
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/renovate.json` | Dependency update configuration for Renovate (enabled by default). | [Documentation](https://docs.renovatebot.com/configuration-options/)
-`.github/_dependabot.yml` | Dependency update configuration for Dependabot (disabled, see "Dependency updates" below). | [Documentation](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`custom_components/integration_blueprint/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`requirements_dev.txt` | Python packages used for development/testing this integration (also installs lint tooling via `requirements_lint.txt`). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
-`requirements_lint.txt` | Python packages used to lint this integration (installed by the Lint CI job). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
-`requirements_common.txt` | Python packages common to CI and local dev, installed first so any pip upgrade completes before other dependencies (e.g. a modern pip). | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
+## Installation
 
-## Dependency updates
+1. In HACS, add `https://github.com/jterrace/ha-otodata-ble` as a custom
+   repository with type Integration.
+2. Download Otodata BLE and restart Home Assistant.
 
-This template ships with configuration for **two** dependency update tools. Pick
-**one** and remove or disable the other:
+## Setup
 
-- **Renovate** (`.github/renovate.json`) is enabled by default.
-- **Dependabot** (`.github/_dependabot.yml`) is included but disabled — the `_`
-  prefix means GitHub ignores it. To use Dependabot instead, rename the file
-  back to `.github/dependabot.yml` and delete `.github/renovate.json`.
+Home Assistant finds the monitor on its own and shows it under Settings >
+Devices & services as a discovered device. Click Add and confirm.
 
-## How?
+The monitor only broadcasts every few hours, so it can take a while to show
+up. You can also add the integration by hand, which lists monitors Home
+Assistant has already heard.
 
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `integration_blueprint` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `Integration Blueprint` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
+## Entities
 
-## Next steps
+| Entity          | Description                                                      |
+| --------------- | ---------------------------------------------------------------- |
+| Propane level   | Tank level in percent                                            |
+| Signal strength | Bluetooth signal in dBm. Diagnostic, disabled by default.        |
 
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon).
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+The device's model and serial number fill in when the monitor sends its
+device info packet, which can be some time after setup.
+
+The level is for the tank the monitor is mounted on. If you have two tanks
+plumbed together, only one is measured.
+
+The sensors go unavailable if the monitor stops broadcasting for longer than
+usual. Until Home Assistant learns how often your monitor broadcasts, it
+allows 6 hours.
+
+## Debug logging
+
+Add this to `configuration.yaml`:
+
+```yaml
+logger:
+  logs:
+    custom_components.otodata_ble: debug
+```
+
+Every Otodata packet is then logged with its raw bytes. Include these logs
+when you open an issue.
+
+## Protocol
+
+The packet format is in [docs/tech-info.md](docs/tech-info.md).
