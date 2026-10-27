@@ -1,10 +1,6 @@
 {
   "domain": "otodata_ble",
   "name": "Otodata BLE",
-  "categories": [
-    "sensors",
-    "energy.meters_monitoring"
-  ],
   "codeowners": [
     "@jterrace"
   ],
