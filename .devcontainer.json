@@ -31,7 +31,8 @@
                 "python.analysis.autoImportCompletions": true,
                 "[python]": {
                     "editor.defaultFormatter": "charliermarsh.ruff"
-                }
+                },
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
             }
         }
     },
@@ -42,6 +43,7 @@
         },
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "ffmpeg,libturbojpeg0,libpcap-dev"
-        }
+        },
+        "ghcr.io/devcontainers-extra/features/uv:1": {}
     }
 }
