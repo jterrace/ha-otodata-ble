@@ -1,5 +1,7 @@
 # Home Assistant Otodata BLE
 
+![Otodata BLE icon](custom_components/otodata_ble/brand/icon.png)
+
 Home Assistant integration for Otodata propane tank monitors. It reads the tank
 level from the monitor's Bluetooth broadcasts.
 
