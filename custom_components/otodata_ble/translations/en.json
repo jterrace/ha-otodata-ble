@@ -21,8 +21,8 @@
   },
   "entity": {
     "sensor": {
-      "propane_level": {
-        "name": "Propane level"
+      "tank_level": {
+        "name": "Tank level"
       }
     }
   }

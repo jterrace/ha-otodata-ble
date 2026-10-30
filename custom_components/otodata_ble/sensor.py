@@ -25,8 +25,8 @@ from .const import MANUFACTURER
 from .coordinator import OtodataConfigEntry, OtodataUpdate
 
 _LEVEL = SensorEntityDescription(
-    key="propane_level",
-    translation_key="propane_level",
+    key="tank_level",
+    translation_key="tank_level",
     native_unit_of_measurement=PERCENTAGE,
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=2,

@@ -27,7 +27,7 @@ TELEMETRY = bytes.fromhex("4f544f54454c450200c00c0000715406180000ff00000000")
 TELEMETRY_OUT_OF_RANGE = b"OTOTELE\x02\x00\xff\xff" + bytes(13)
 STATUS = bytes.fromhex("4f544f5354415401730073008abc040007b7000000000000")
 
-LEVEL_ENTITY = "sensor.otodata_ee01_propane_level"
+LEVEL_ENTITY = "sensor.otodata_ee01_tank_level"
 SIGNAL_ENTITY = "sensor.otodata_ee01_signal_strength"
 
 
@@ -81,7 +81,7 @@ def _device(hass: HomeAssistant) -> dr.DeviceEntry | None:
 
 @pytest.mark.usefixtures("entry")
 async def test_telemetry(hass: HomeAssistant) -> None:
-    """A telemetry packet creates the propane level sensor."""
+    """A telemetry packet creates the tank level sensor."""
     _inject(hass, {945: TELEMETRY})
     await hass.async_block_till_done()
 
@@ -90,7 +90,7 @@ async def test_telemetry(hass: HomeAssistant) -> None:
     assert float(state.state) == pytest.approx(32.64)
     assert state.attributes["unit_of_measurement"] == PERCENTAGE
     assert state.attributes["state_class"] == "measurement"
-    assert state.attributes["friendly_name"] == "Otodata EE01 Propane level"
+    assert state.attributes["friendly_name"] == "Otodata EE01 Tank level"
 
 
 @pytest.mark.usefixtures("entry")

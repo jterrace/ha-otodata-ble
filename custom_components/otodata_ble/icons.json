@@ -1,8 +1,8 @@
 {
   "entity": {
     "sensor": {
-      "propane_level": {
-        "default": "mdi:propane-tank"
+      "tank_level": {
+        "default": "mdi:storage-tank"
       }
     }
   }

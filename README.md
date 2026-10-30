@@ -32,7 +32,7 @@ Assistant has already heard.
 
 | Entity          | Description                                                      |
 | --------------- | ---------------------------------------------------------------- |
-| Propane level   | Tank level in percent                                            |
+| Tank level      | Tank level in percent                                            |
 | Signal strength | Bluetooth signal in dBm. Diagnostic, disabled by default.        |
 
 The device's model and serial number fill in when the monitor sends its
