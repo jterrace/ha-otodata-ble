@@ -33,6 +33,7 @@ Assistant has already heard.
 | Entity          | Description                                                      |
 | --------------- | ---------------------------------------------------------------- |
 | Tank level      | Tank level in percent                                            |
+| Fuel remaining  | Tank level times the tank capacity. Only if a capacity is set.   |
 | Signal strength | Bluetooth signal in dBm. Diagnostic, disabled by default.        |
 
 The device's model and serial number fill in when the monitor sends its
@@ -40,6 +41,11 @@ device info packet, which can be some time after setup.
 
 The level is for the tank the monitor is mounted on. If you have two tanks
 plumbed together, only one is measured.
+
+To get the fuel remaining sensor, open the integration's options and enter
+the tank capacity in gallons or liters. Use the full size of the tank, not the
+80% it's filled to. The level already counts from the full size. For tanks
+plumbed together, enter the total.
 
 The sensors go unavailable if the monitor stops broadcasting for longer than
 usual. Until Home Assistant learns how often your monitor broadcasts, it

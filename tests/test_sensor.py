@@ -12,13 +12,14 @@ from homeassistant.components.bluetooth import (
     async_get_fallback_availability_interval,
 )
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import CONF_UNIT_OF_MEASUREMENT, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.otodata_ble.const import DOMAIN
+from custom_components.otodata_ble.const import CONF_CAPACITY, DOMAIN
 
 ADDRESS = "AA:BB:CC:DD:EE:01"
 
@@ -29,6 +30,9 @@ STATUS = bytes.fromhex("4f544f5354415401730073008abc040007b7000000000000")
 
 LEVEL_ENTITY = "sensor.otodata_ee01_tank_level"
 SIGNAL_ENTITY = "sensor.otodata_ee01_signal_strength"
+FUEL_ENTITY = "sensor.otodata_ee01_fuel_remaining"
+
+CAPACITY_OPTIONS = {CONF_CAPACITY: 240, CONF_UNIT_OF_MEASUREMENT: "gal"}
 
 
 def _inject(
@@ -62,14 +66,32 @@ def _inject(
     )
 
 
-@pytest.fixture
-async def entry(hass: HomeAssistant) -> MockConfigEntry:
+async def _setup_entry(
+    hass: HomeAssistant, options: dict[str, object] | None = None
+) -> MockConfigEntry:
     """Set up a config entry for one monitor."""
-    entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, title="Otodata EE01")
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id=ADDRESS, title="Otodata EE01", options=options or {}
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
+
+
+@pytest.fixture
+async def entry(hass: HomeAssistant) -> MockConfigEntry:
+    """Set up a config entry for one monitor with no options."""
+    return await _setup_entry(hass)
+
+
+async def _set_options(
+    hass: HomeAssistant, entry: MockConfigEntry, options: dict[str, object]
+) -> None:
+    """Save options through the options flow, which reloads the entry."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], options)
+    await hass.async_block_till_done()
 
 
 def _device(hass: HomeAssistant) -> dr.DeviceEntry | None:
@@ -216,3 +238,94 @@ async def test_unload(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_fuel_remaining(hass: HomeAssistant) -> None:
+    """With a capacity set, the fuel remaining is the level times the capacity."""
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    await _setup_entry(hass, CAPACITY_OPTIONS)
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+
+    state = hass.states.get(FUEL_ENTITY)
+    assert state is not None
+    assert float(state.state) == pytest.approx(240 * 0.3264)
+    assert state.attributes["unit_of_measurement"] == "gal"
+    assert state.attributes["device_class"] == "volume_storage"
+    assert state.attributes["state_class"] == "measurement"
+    assert state.attributes["friendly_name"] == "Otodata EE01 Fuel remaining"
+
+
+async def test_fuel_remaining_waits_for_level(hass: HomeAssistant) -> None:
+    """The fuel remaining sensor isn't added before there is a level."""
+    await _setup_entry(hass, CAPACITY_OPTIONS)
+    _inject(hass, {945: STATUS})
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(FUEL_ENTITY) is None
+
+
+@pytest.mark.usefixtures("entry")
+async def test_no_fuel_remaining_without_capacity(hass: HomeAssistant) -> None:
+    """Without a capacity there is no fuel remaining sensor."""
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+    assert hass.states.get(LEVEL_ENTITY) is not None
+    assert er.async_get(hass).async_get(FUEL_ENTITY) is None
+
+
+async def test_capacity_set_later(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Setting a capacity adds the sensor right away from the last level."""
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+    _inject(hass, {945: STATUS})
+    await hass.async_block_till_done()
+
+    await _set_options(hass, entry, CAPACITY_OPTIONS)
+    state = hass.states.get(FUEL_ENTITY)
+    assert state is not None
+    assert float(state.state) == pytest.approx(240 * 0.3264)
+
+
+async def test_capacity_cleared(hass: HomeAssistant) -> None:
+    """Clearing the capacity removes the fuel remaining sensor."""
+    entry = await _setup_entry(hass, CAPACITY_OPTIONS)
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(FUEL_ENTITY) is not None
+
+    await _set_options(hass, entry, {CONF_UNIT_OF_MEASUREMENT: "gal"})
+    assert er.async_get(hass).async_get(FUEL_ENTITY) is None
+    assert hass.states.get(FUEL_ENTITY) is None
+
+
+async def test_unit_changed(hass: HomeAssistant) -> None:
+    """Changing the unit takes effect without waiting for a broadcast."""
+    entry = await _setup_entry(hass, CAPACITY_OPTIONS)
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+    _inject(hass, {945: STATUS})
+    await hass.async_block_till_done()
+
+    await _set_options(hass, entry, {CONF_CAPACITY: 900, CONF_UNIT_OF_MEASUREMENT: "L"})
+    state = hass.states.get(FUEL_ENTITY)
+    assert state is not None
+    assert state.attributes["unit_of_measurement"] == "L"
+    assert float(state.state) == pytest.approx(900 * 0.3264)
+
+
+async def test_values_restored_after_reload(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The last level is shown again after a reload, before the next broadcast."""
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+    _inject(hass, {945: STATUS})
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(LEVEL_ENTITY)
+    assert state is not None
+    assert float(state.state) == pytest.approx(32.64)
+    assert state.attributes["unit_of_measurement"] == PERCENTAGE

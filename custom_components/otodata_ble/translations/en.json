@@ -23,6 +23,22 @@
     "sensor": {
       "tank_level": {
         "name": "Tank level"
+      },
+      "fuel_remaining": {
+        "name": "Fuel remaining"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "capacity": "Tank capacity",
+          "unit_of_measurement": "Unit"
+        },
+        "data_description": {
+          "capacity": "Full size of the tank, not the 80% it's filled to. For tanks plumbed together, enter the total. Leave empty to turn off the fuel remaining sensor."
+        }
       }
     }
   }

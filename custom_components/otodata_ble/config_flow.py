@@ -7,10 +7,24 @@ from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
 )
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_ADDRESS
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
+from homeassistant.const import CONF_ADDRESS, CONF_UNIT_OF_MEASUREMENT, UnitOfVolume
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+)
 
-from .const import DOMAIN, MANUFACTURER_ID
+from .const import CONF_CAPACITY, DOMAIN, MANUFACTURER_ID
 from .parser import get_packet_type
 
 
@@ -34,6 +48,12 @@ class OtodataConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Otodata BLE."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OtodataOptionsFlow:  # noqa: ARG004
+        """Return the options flow."""
+        return OtodataOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -96,5 +116,42 @@ class OtodataConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {vol.Required(CONF_ADDRESS): vol.In(self._discovered_devices)}
+            ),
+        )
+
+
+class OtodataOptionsFlow(OptionsFlowWithReload):
+    """Set the tank capacity used for the fuel remaining sensor."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the tank capacity form."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_CAPACITY): NumberSelector(
+                    NumberSelectorConfig(min=1, step="any", mode=NumberSelectorMode.BOX)
+                ),
+                vol.Required(
+                    CONF_UNIT_OF_MEASUREMENT, default=self.hass.config.units.volume_unit
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(
+                                value=UnitOfVolume.GALLONS, label="Gallons"
+                            ),
+                            SelectOptionDict(value=UnitOfVolume.LITERS, label="Liters"),
+                        ],
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self.config_entry.options
             ),
         )

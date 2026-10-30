@@ -6,3 +6,6 @@ DOMAIN = "otodata_ble"
 MANUFACTURER_ID = 945
 
 MANUFACTURER = "Otodata"
+
+# Tank capacity option, in the unit of the unit_of_measurement option.
+CONF_CAPACITY = "capacity"

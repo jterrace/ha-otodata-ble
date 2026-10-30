@@ -2,14 +2,20 @@
 
 from unittest.mock import patch
 
+import pytest
 from home_assistant_bluetooth import BluetoothServiceInfo
 from homeassistant.config_entries import SOURCE_BLUETOOTH, SOURCE_USER
-from homeassistant.const import CONF_ADDRESS
+from homeassistant.const import CONF_ADDRESS, CONF_UNIT_OF_MEASUREMENT
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.util.unit_system import (
+    METRIC_SYSTEM,
+    US_CUSTOMARY_SYSTEM,
+    UnitSystem,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.otodata_ble.const import DOMAIN
+from custom_components.otodata_ble.const import CONF_CAPACITY, DOMAIN
 
 ADDRESS = "AA:BB:CC:DD:EE:01"
 OTHER_ADDRESS = "AA:BB:CC:DD:EE:02"
@@ -157,3 +163,37 @@ async def test_user_step_replaces_discovery(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+
+
+@pytest.mark.parametrize(
+    ("units", "unit"), [(US_CUSTOMARY_SYSTEM, "gal"), (METRIC_SYSTEM, "L")]
+)
+async def test_options_default_unit(
+    hass: HomeAssistant, units: UnitSystem, unit: str
+) -> None:
+    """The unit defaults to the one that goes with Home Assistant's unit system."""
+    hass.config.units = units
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_CAPACITY: 240}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {CONF_CAPACITY: 240, CONF_UNIT_OF_MEASUREMENT: unit}
+
+
+async def test_options_prefilled(hass: HomeAssistant) -> None:
+    """The form shows the current options."""
+    options = {CONF_CAPACITY: 500, CONF_UNIT_OF_MEASUREMENT: "L"}
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=ADDRESS, options=options)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+    }
+    assert suggested == options

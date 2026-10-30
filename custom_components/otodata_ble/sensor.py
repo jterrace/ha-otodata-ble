@@ -1,5 +1,7 @@
 """Sensors for Otodata tank monitors."""
 
+from dataclasses import replace
+
 from homeassistant.components.bluetooth.passive_update_processor import (
     PassiveBluetoothDataProcessor,
     PassiveBluetoothDataUpdate,
@@ -13,15 +15,18 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    CONF_UNIT_OF_MEASUREMENT,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
+    Platform,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import MANUFACTURER
+from .const import CONF_CAPACITY, DOMAIN, MANUFACTURER
 from .coordinator import OtodataConfigEntry, OtodataUpdate
 
 _LEVEL = SensorEntityDescription(
@@ -38,6 +43,14 @@ _SIGNAL_STRENGTH = SensorEntityDescription(
     state_class=SensorStateClass.MEASUREMENT,
     entity_category=EntityCategory.DIAGNOSTIC,
     entity_registry_enabled_default=False,
+)
+# The unit comes from the options.
+_FUEL_REMAINING = SensorEntityDescription(
+    key="fuel_remaining",
+    translation_key="fuel_remaining",
+    device_class=SensorDeviceClass.VOLUME_STORAGE,
+    state_class=SensorStateClass.MEASUREMENT,
+    suggested_display_precision=1,
 )
 
 _LEVEL_KEY = PassiveBluetoothEntityKey(_LEVEL.key, None)
@@ -64,7 +77,7 @@ def _to_data_update(
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001
+    hass: HomeAssistant,
     entry: OtodataConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
@@ -78,7 +91,46 @@ async def async_setup_entry(
     entry.async_on_unload(
         processor.async_add_entities_listener(OtodataSensor, async_add_entities)
     )
-    entry.async_on_unload(entry.runtime_data.async_register_processor(processor))
+    _async_setup_fuel_remaining(hass, entry, processor, async_add_entities)
+    # Restores the last values, so the sensors aren't empty until the next
+    # broadcast after a restart or reload.
+    entry.async_on_unload(
+        entry.runtime_data.async_register_processor(processor, SensorEntityDescription)
+    )
+
+
+def _async_setup_fuel_remaining(
+    hass: HomeAssistant,
+    entry: OtodataConfigEntry,
+    processor: _Processor,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Add the fuel remaining sensor along with the level, if a capacity is set."""
+    if (capacity := entry.options.get(CONF_CAPACITY)) is None:
+        # Remove the sensor left over from when a capacity was set.
+        registry = er.async_get(hass)
+        unique_id = f"{entry.unique_id}-{_FUEL_REMAINING.key}"
+        if entity_id := registry.async_get_entity_id(
+            Platform.SENSOR, DOMAIN, unique_id
+        ):
+            registry.async_remove(entity_id)
+        return
+
+    description = replace(
+        _FUEL_REMAINING,
+        native_unit_of_measurement=entry.options[CONF_UNIT_OF_MEASUREMENT],
+    )
+    added = False
+
+    @callback
+    def _async_add(_data: PassiveBluetoothDataUpdate[float] | None) -> None:
+        nonlocal added
+        if added or _LEVEL_KEY not in processor.entity_descriptions:
+            return
+        added = True
+        async_add_entities([OtodataFuelSensor(processor, description, capacity)])
+
+    entry.async_on_unload(processor.async_add_listener(_async_add))
 
 
 class OtodataSensor(PassiveBluetoothProcessorEntity[_Processor], SensorEntity):
@@ -88,3 +140,24 @@ class OtodataSensor(PassiveBluetoothProcessorEntity[_Processor], SensorEntity):
     def native_value(self) -> float | None:
         """Return the latest value."""
         return self.processor.entity_data.get(self.entity_key)
+
+
+class OtodataFuelSensor(OtodataSensor):
+    """Fuel remaining, worked out from the tank level and capacity."""
+
+    def __init__(
+        self,
+        processor: _Processor,
+        description: SensorEntityDescription,
+        capacity: float,
+    ) -> None:
+        """Follow the level sensor's data under this sensor's own unique ID."""
+        super().__init__(processor, _LEVEL_KEY, description)
+        self._attr_unique_id = f"{processor.coordinator.address}-{description.key}"
+        self._capacity = capacity
+
+    @property
+    def native_value(self) -> float:
+        """Return the fuel remaining."""
+        # Only added once there is a level.
+        return self._capacity * self.processor.entity_data[_LEVEL_KEY] / 100
