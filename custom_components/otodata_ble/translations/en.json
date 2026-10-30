@@ -26,6 +26,9 @@
       },
       "fuel_remaining": {
         "name": "Fuel remaining"
+      },
+      "tank_capacity": {
+        "name": "Tank capacity"
       }
     }
   },

@@ -34,6 +34,7 @@ Assistant has already heard.
 | --------------- | ---------------------------------------------------------------- |
 | Tank level      | Tank level in percent                                            |
 | Fuel remaining  | Tank level times the tank capacity. Only if a capacity is set.   |
+| Tank capacity   | The capacity you entered. Diagnostic, only if a capacity is set. |
 | Signal strength | Bluetooth signal in dBm. Diagnostic, disabled by default.        |
 
 The device's model and serial number fill in when the monitor sends its

@@ -31,6 +31,7 @@ STATUS = bytes.fromhex("4f544f5354415401730073008abc040007b7000000000000")
 LEVEL_ENTITY = "sensor.otodata_ee01_tank_level"
 SIGNAL_ENTITY = "sensor.otodata_ee01_signal_strength"
 FUEL_ENTITY = "sensor.otodata_ee01_fuel_remaining"
+CAPACITY_ENTITY = "sensor.otodata_ee01_tank_capacity"
 
 CAPACITY_OPTIONS = {CONF_CAPACITY: 240, CONF_UNIT_OF_MEASUREMENT: "gal"}
 
@@ -256,6 +257,25 @@ async def test_fuel_remaining(hass: HomeAssistant) -> None:
     assert state.attributes["friendly_name"] == "Otodata EE01 Fuel remaining"
 
 
+async def test_tank_capacity(hass: HomeAssistant) -> None:
+    """With a capacity set, a diagnostic sensor shows it."""
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    await _setup_entry(hass, CAPACITY_OPTIONS)
+    _inject(hass, {945: TELEMETRY})
+    await hass.async_block_till_done()
+
+    state = hass.states.get(CAPACITY_ENTITY)
+    assert state is not None
+    assert state.state == "240"
+    assert state.attributes["unit_of_measurement"] == "gal"
+    assert state.attributes["device_class"] == "volume_storage"
+    assert "state_class" not in state.attributes
+    assert state.attributes["friendly_name"] == "Otodata EE01 Tank capacity"
+    entity = er.async_get(hass).async_get(CAPACITY_ENTITY)
+    assert entity is not None
+    assert entity.entity_category is er.EntityCategory.DIAGNOSTIC
+
+
 async def test_fuel_remaining_waits_for_level(hass: HomeAssistant) -> None:
     """The fuel remaining sensor isn't added before there is a level."""
     await _setup_entry(hass, CAPACITY_OPTIONS)
@@ -288,15 +308,17 @@ async def test_capacity_set_later(hass: HomeAssistant, entry: MockConfigEntry) -
 
 
 async def test_capacity_cleared(hass: HomeAssistant) -> None:
-    """Clearing the capacity removes the fuel remaining sensor."""
+    """Clearing the capacity removes the sensors that use it."""
     entry = await _setup_entry(hass, CAPACITY_OPTIONS)
     _inject(hass, {945: TELEMETRY})
     await hass.async_block_till_done()
     assert er.async_get(hass).async_get(FUEL_ENTITY) is not None
+    assert er.async_get(hass).async_get(CAPACITY_ENTITY) is not None
 
     await _set_options(hass, entry, {CONF_UNIT_OF_MEASUREMENT: "gal"})
-    assert er.async_get(hass).async_get(FUEL_ENTITY) is None
-    assert hass.states.get(FUEL_ENTITY) is None
+    for entity_id in (FUEL_ENTITY, CAPACITY_ENTITY):
+        assert er.async_get(hass).async_get(entity_id) is None
+        assert hass.states.get(entity_id) is None
 
 
 async def test_unit_changed(hass: HomeAssistant) -> None:
@@ -312,6 +334,10 @@ async def test_unit_changed(hass: HomeAssistant) -> None:
     assert state is not None
     assert state.attributes["unit_of_measurement"] == "L"
     assert float(state.state) == pytest.approx(900 * 0.3264)
+    state = hass.states.get(CAPACITY_ENTITY)
+    assert state is not None
+    assert state.attributes["unit_of_measurement"] == "L"
+    assert state.state == "900.0"
 
 
 async def test_values_restored_after_reload(
