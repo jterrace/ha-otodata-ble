@@ -15,7 +15,13 @@ should work. Open an issue if yours doesn't.
 
 ## Installation
 
-1. In HACS, add `https://github.com/jterrace/ha-otodata-ble` as a custom
+### HACS / Marketplace
+
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=jterrace&repository=ha-otodata-ble&category=integration)
+
+### Manual
+
+1. In HACS / Marketplace, add `https://github.com/jterrace/ha-otodata-ble` as a custom
    repository with type Integration.
 2. Download Otodata BLE and restart Home Assistant.
 
