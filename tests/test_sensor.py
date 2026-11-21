@@ -24,6 +24,7 @@ from custom_components.otodata_ble.const import CONF_CAPACITY, DOMAIN
 ADDRESS = "AA:BB:CC:DD:EE:01"
 
 INFO = bytes.fromhex("4f544f333238319d7c38010d1210036404021a8e170004")
+INFO_SHORT = bytes.fromhex("4f544f33323831c58240010d12100170")
 TELEMETRY = bytes.fromhex("4f544f54454c450200c00c0000715406180000ff00000000")
 TELEMETRY_OUT_OF_RANGE = b"OTOTELE\x02\x00\xff\xff" + bytes(13)
 STATUS = bytes.fromhex("4f544f5354415401730073008abc040007b7000000000000")
@@ -37,11 +38,14 @@ CAPACITY_OPTIONS = {CONF_CAPACITY: 240, CONF_UNIT_OF_MEASUREMENT: "gal"}
 
 
 def _inject(
-    hass: HomeAssistant, manufacturer_data: dict[int, bytes], rssi: int = -70
+    hass: HomeAssistant,
+    manufacturer_data: dict[int, bytes],
+    rssi: int = -70,
+    name: str | None = None,
 ) -> None:
-    """Deliver an advertisement as if a passive proxy had just heard it."""
+    """Deliver an advertisement as if a proxy had just heard it."""
     advertisement = AdvertisementData(
-        local_name=None,
+        local_name=name,
         manufacturer_data=manufacturer_data,
         service_data={},
         service_uuids=[],
@@ -51,7 +55,7 @@ def _inject(
     )
     async_get_advertisement_callback(hass)(
         BluetoothServiceInfoBleak(
-            name=ADDRESS,
+            name=name or ADDRESS,
             address=ADDRESS,
             rssi=rssi,
             manufacturer_data=manufacturer_data,
@@ -166,6 +170,51 @@ async def test_device_info_before_sensors(
     entity = er.async_get(hass).async_get(LEVEL_ENTITY)
     assert entity is not None
     assert entity.device_id == device.id
+
+
+@pytest.mark.usefixtures("entry")
+async def test_short_info_level_from_name(hass: HomeAssistant) -> None:
+    """A monitor with a short info packet gets its level from the local name."""
+    _inject(hass, {945: INFO_SHORT}, name="Bell         R1|-66")
+    await hass.async_block_till_done()
+    assert hass.states.get(LEVEL_ENTITY) is None
+    device = _device(hass)
+    assert device is not None
+    assert device.serial_number == "21004997"
+    assert device.model is None
+
+    _inject(hass, {945: INFO_SHORT}, name="level: 80 % vertica")
+    await hass.async_block_till_done()
+    state = hass.states.get(LEVEL_ENTITY)
+    assert state is not None
+    assert float(state.state) == pytest.approx(80.0)
+
+    # A name without a level keeps the last level.
+    _inject(hass, {945: INFO_SHORT}, name="unit sleeping")
+    await hass.async_block_till_done()
+    state = hass.states.get(LEVEL_ENTITY)
+    assert state is not None
+    assert float(state.state) == pytest.approx(80.0)
+
+
+@pytest.mark.usefixtures("entry")
+async def test_short_info_keeps_known_model(hass: HomeAssistant) -> None:
+    """A short info packet doesn't clear a model learned earlier."""
+    _inject(hass, {945: INFO})
+    await hass.async_block_till_done()
+    _inject(hass, {945: INFO_SHORT})
+    await hass.async_block_till_done()
+    device = _device(hass)
+    assert device is not None
+    assert device.model == "TM6030"
+
+
+@pytest.mark.usefixtures("entry")
+async def test_full_info_ignores_name_level(hass: HomeAssistant) -> None:
+    """Monitors with a full info packet only take their level from OTOTELE."""
+    _inject(hass, {945: INFO}, name="level: 80 % vertical")
+    await hass.async_block_till_done()
+    assert hass.states.get(LEVEL_ENTITY) is None
 
 
 @pytest.mark.usefixtures("entry")

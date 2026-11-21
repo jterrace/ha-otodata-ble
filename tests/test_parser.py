@@ -10,6 +10,7 @@ from custom_components.otodata_ble.parser import (
     PacketType,
     get_packet_type,
     parse_info,
+    parse_name_level,
     parse_telemetry,
 )
 
@@ -17,6 +18,9 @@ from custom_components.otodata_ble.parser import (
 INFO_TM6030 = "4f544f333238319d7c38010d1210036404021a8e170004"
 # Second-hand sample from another monitor: TM5040, serial 29122704
 INFO_TM5040 = "4f544f333238319060bc011018210384060304b0130205"
+# Short info packet with no model number, serial 21004997. This monitor sends
+# no OTOTELE packets; its level is only in the local name.
+INFO_SHORT = "4f544f33323831c58240010d12100170"
 
 TELEMETRY = [
     ("4f544f54454c450200121d0005703606180000ff00000000", 74.42),
@@ -49,6 +53,7 @@ STATUS = [
     [
         (INFO_TM6030, PacketType.INFO),
         (INFO_TM5040, PacketType.INFO),
+        (INFO_SHORT, PacketType.INFO),
         *((payload, PacketType.TELEMETRY) for payload, _ in TELEMETRY),
         *((payload, PacketType.STATUS) for payload in STATUS),
     ],
@@ -78,23 +83,26 @@ def test_get_packet_type_unknown(
 
 
 @pytest.mark.parametrize(
-    ("payload", "serial", "model"),
+    ("payload", "serial", "model_number", "model"),
     [
-        (INFO_TM6030, 20479133, "TM6030"),
-        (INFO_TM5040, 29122704, "TM5040"),
+        (INFO_TM6030, 20479133, 6030, "TM6030"),
+        (INFO_TM5040, 29122704, 5040, "TM5040"),
+        pytest.param(INFO_SHORT, 21004997, None, None, id="short"),
     ],
 )
-def test_parse_info(payload: str, serial: int, model: str) -> None:
+def test_parse_info(
+    payload: str, serial: int, model_number: int | None, model: str | None
+) -> None:
     """Info packets decode to the right serial number and model."""
     info = parse_info(bytes.fromhex(payload))
-    assert info == OtodataInfo(serial=serial, model_number=int(model[2:]))
+    assert info == OtodataInfo(serial=serial, model_number=model_number)
     assert info.model == model
 
 
 @pytest.mark.parametrize(
     "payload",
     [
-        pytest.param(bytes.fromhex(INFO_TM6030)[:20], id="truncated"),
+        pytest.param(bytes.fromhex(INFO_TM6030)[:10], id="truncated"),
         pytest.param(bytes.fromhex(TELEMETRY[0][0]), id="wrong-type"),
         pytest.param(b"", id="empty"),
     ],
@@ -142,3 +150,36 @@ def test_parse_telemetry_invalid(
     with caplog.at_level(logging.DEBUG):
         assert parse_telemetry(payload) is None
     assert payload.hex() in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("name", "level"),
+    [
+        pytest.param("level: 80 % vertica", 80.0, id="cut-short"),
+        pytest.param("level: 32.6 % vertical", 32.6, id="decimal"),
+        pytest.param("level: 5 % vertical", 5.0, id="one-digit"),
+        pytest.param("level: 100 % verti", 100.0, id="full"),
+        pytest.param("level: 0 % vertical", 0.0, id="empty"),
+    ],
+)
+def test_parse_name_level(name: str, level: float) -> None:
+    """The level is read from the rotating local name."""
+    assert parse_name_level(name) == OtodataTelemetry(level=level)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(None, id="none"),
+        pytest.param("", id="empty"),
+        pytest.param("Bell         R1|-66", id="other-name"),
+        pytest.param("unit sleeping", id="sleeping"),
+        pytest.param("trbl:ACC (32.6)", id="trouble"),
+        pytest.param("TM6030 20479133", id="model-serial"),
+        pytest.param("CA:A0:26:0B:8C:9B", id="address"),
+        pytest.param("level: 101 % vertical", id="over-100"),
+    ],
+)
+def test_parse_name_level_none(name: str | None) -> None:
+    """Names without a valid level return None."""
+    assert parse_name_level(name) is None

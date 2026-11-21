@@ -17,7 +17,7 @@ Every payload starts with a 7-character ASCII packet type:
 
 | Type      | Length | Contents                          |
 | --------- | ------ | --------------------------------- |
-| `OTO3281` | 23     | Device info: serial, model number |
+| `OTO3281` | 23, 16 | Device info: serial, model number |
 | `OTOTELE` | 24     | Telemetry: tank level             |
 | `OTOSTAT` | 24     | Status: not yet decoded           |
 
@@ -30,6 +30,35 @@ Every payload starts with a 7-character ASCII packet type:
 | `11:19` | ?      | Unknown       | `0d 12 10 03 64 04 02 1a`  |
 | `19:21` | u16 LE | Model number  | `8e 17` → `6030` (TM6030)  |
 | `21:23` | ?      | Unknown       | `00 04`                    |
+
+### Short variant (16 bytes)
+
+Seen from a monitor of unknown model, serial `21004997`:
+`4f544f33323831c58240010d12100170`.
+
+| Offset  | Type   | Meaning       | Example                    |
+| ------- | ------ | ------------- | -------------------------- |
+| `0:7`   | ASCII  | `OTO3281`     |                            |
+| `7:11`  | u32 LE | Serial number | `c5 82 40 01` → `21004997` |
+| `11:16` | ?      | Unknown       | `0d 12 10 01 70`           |
+
+There is no model number. Byte `14` is `01` here and `03` in both 23-byte
+samples, so it may mark the format. Bytes `11:14` match the TM6030's.
+
+This monitor sends no `OTOTELE` or `OTOSTAT` packets. Its only level is in the
+local name (see below). It also sends an iBeacon (company ID `0x004C`) with
+UUID `a4552f9f-4317-4e99-8923-0d3c393c43c7`, major `ffff`, minor `01ff`, which
+looks constant. Its names seen so far are `level: <x> % vertica`, where the
+level is a whole percent and the name is cut short to fit the scan response,
+and `Bell         R1|-66`.
+
+Raw scan response carrying the level:
+
+```
+03 19 00 02                      appearance 0x0200 (generic tag)
+02 01 06                         flags
+14 09 6c6576656c3a20383020252076657274696361   name "level: 80 % vertica"
+```
 
 ## OTOTELE: telemetry
 
@@ -78,8 +107,10 @@ next to a packet may come from an earlier advertisement. The name has been seen
 saying `level: 32.6 % vertical` while the payload had already dropped to
 31.44–31.45%, so the name lags behind the payload.
 
-**Integrations should not depend on the name.** Everything they need is in the
-payload.
+**Integrations should not depend on the name** for monitors that send
+`OTOTELE` packets. Everything they need is in the payload. Monitors with the
+short info packet are the exception: the integration reads their level from a
+name starting `level:`.
 
 ## Sample payloads (hex)
 

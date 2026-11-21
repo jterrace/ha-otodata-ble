@@ -8,6 +8,11 @@ level from the monitor's Bluetooth broadcasts.
 Tested with a TM6030. Other Otodata monitors that broadcast the same packets
 should work. Open an issue if yours doesn't.
 
+Some monitors send a short device info packet with no model number and no
+level packet. For these, the level is read from the monitor's name instead,
+which needs a Bluetooth adapter or proxy that scans actively. That level is
+rounded to whole percent and updates less often.
+
 ## Requirements
 
 - Home Assistant 2026.6.4 or newer
@@ -39,7 +44,8 @@ Assistant has already heard.
 | Signal strength | Bluetooth signal in dBm. Diagnostic, disabled by default.        |
 
 The device's model and serial number fill in when the monitor sends its
-device info packet, which can be some time after setup.
+device info packet, which can be some time after setup. Monitors with a short
+info packet only fill in the serial number.
 
 The level is for the tank the monitor is mounted on. If you have two tanks
 plumbed together, only one is measured.
