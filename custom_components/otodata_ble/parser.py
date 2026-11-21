@@ -6,6 +6,7 @@ company ID already stripped.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -14,12 +15,18 @@ _LOGGER = logging.getLogger(__name__)
 _PACKET_PREFIX = b"OTO"
 _PACKET_TYPE_LENGTH = 7
 
-# Minimum lengths needed to read the fields we decode.
-_INFO_MIN_LENGTH = 21
+# Minimum lengths needed to read the fields we decode. Some monitors send a
+# short info packet that stops before the model number.
+_INFO_MIN_LENGTH = 11
+_INFO_WITH_MODEL_MIN_LENGTH = 21
 _TELEMETRY_MIN_LENGTH = 11
 
 _LEVEL_MIN = 0.0
 _LEVEL_MAX = 100.0
+
+# The level in the rotating local name, e.g. "level: 80 % vertical". The name
+# can be cut short to fit the scan response, e.g. "level: 80 % vertica".
+_NAME_LEVEL_PATTERN = re.compile(r"level:\s*(\d+(?:\.\d+)?)\s*%")
 
 
 class PacketType(Enum):
@@ -35,11 +42,14 @@ class OtodataInfo:
     """Device information from an OTO3281 packet."""
 
     serial: int
-    model_number: int
+    # None for monitors whose short info packet has no model number.
+    model_number: int | None
 
     @property
-    def model(self) -> str:
-        """Return the product model name, e.g. TM6030."""
+    def model(self) -> str | None:
+        """Return the product model name, e.g. TM6030, if known."""
+        if self.model_number is None:
+            return None
         return f"TM{self.model_number}"
 
 
@@ -70,9 +80,12 @@ def parse_info(payload: bytes) -> OtodataInfo | None:
     if not payload.startswith(PacketType.INFO.value) or len(payload) < _INFO_MIN_LENGTH:
         _LOGGER.debug("Ignoring invalid info packet: %s", payload.hex())
         return None
+    model_number = None
+    if len(payload) >= _INFO_WITH_MODEL_MIN_LENGTH:
+        model_number = int.from_bytes(payload[19:21], byteorder="little")
     return OtodataInfo(
         serial=int.from_bytes(payload[7:11], byteorder="little"),
-        model_number=int.from_bytes(payload[19:21], byteorder="little"),
+        model_number=model_number,
     )
 
 
@@ -91,5 +104,21 @@ def parse_telemetry(payload: bytes) -> OtodataTelemetry | None:
             level,
             payload.hex(),
         )
+        return None
+    return OtodataTelemetry(level=level)
+
+
+def parse_name_level(name: str | None) -> OtodataTelemetry | None:
+    """
+    Decode the tank level from the local name, or return None if it has none.
+
+    Monitors that send no OTOTELE packets only report the level in the
+    rotating name of their scan response, rounded and lagging the real level.
+    """
+    if not name or not (match := _NAME_LEVEL_PATTERN.match(name)):
+        return None
+    level = float(match.group(1))
+    if not _LEVEL_MIN <= level <= _LEVEL_MAX:
+        _LOGGER.debug("Ignoring out of range level in name: %r", name)
         return None
     return OtodataTelemetry(level=level)

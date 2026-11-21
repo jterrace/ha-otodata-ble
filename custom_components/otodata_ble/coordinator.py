@@ -10,6 +10,7 @@ from homeassistant.components.bluetooth.passive_update_processor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.typing import UNDEFINED
 
 from .const import MANUFACTURER, MANUFACTURER_ID
 from .parser import (
@@ -18,6 +19,7 @@ from .parser import (
     PacketType,
     get_packet_type,
     parse_info,
+    parse_name_level,
     parse_telemetry,
 )
 
@@ -29,8 +31,9 @@ class OtodataUpdate:
     """
     What one advertisement told us.
 
-    Each advertisement carries one packet type, so at most one of info and
-    telemetry is set.
+    Each advertisement carries one packet type, so usually at most one of
+    info and telemetry is set. Monitors with a short info packet are the
+    exception: their level comes from the local name, alongside the info.
     """
 
     rssi: int
@@ -54,14 +57,22 @@ def parse_service_info(service_info: BluetoothServiceInfoBleak) -> OtodataUpdate
         return None
     # Log every payload so captures can be used to decode more fields.
     _LOGGER.debug(
-        "Advertisement from %s rssi=%s: %s",
+        "Advertisement from %s rssi=%s name=%r: %s",
         service_info.address,
         service_info.rssi,
+        service_info.name,
         payload.hex(),
     )
     match get_packet_type(payload):
         case PacketType.INFO:
-            return OtodataUpdate(rssi=service_info.rssi, info=parse_info(payload))
+            info = parse_info(payload)
+            telemetry = None
+            # Monitors with a short info packet send no OTOTELE packets; their
+            # level is only in the name. Other monitors' OTOTELE level is more
+            # precise and more recent, so their name is ignored.
+            if info is not None and info.model_number is None:
+                telemetry = parse_name_level(service_info.name)
+            return OtodataUpdate(rssi=service_info.rssi, info=info, telemetry=telemetry)
         case PacketType.TELEMETRY:
             return OtodataUpdate(
                 rssi=service_info.rssi, telemetry=parse_telemetry(payload)
@@ -89,6 +100,6 @@ def async_update_device_info(
         connections={(dr.CONNECTION_BLUETOOTH, entry.unique_id)},
         name=entry.title,
         manufacturer=MANUFACTURER,
-        model=info.model,
+        model=info.model or UNDEFINED,
         serial_number=str(info.serial),
     )
